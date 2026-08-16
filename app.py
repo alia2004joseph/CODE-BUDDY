@@ -82,6 +82,16 @@ CUSTOM_CSS = """
         color: var(--white) !important;
     }
 
+    /* Keep the sidebar from swallowing the whole screen on narrow/mobile
+       viewports, where Streamlit otherwise expands it near full-width. */
+    @media (max-width: 640px) {
+        section[data-testid="stSidebar"] {
+            width: 78vw !important;
+            min-width: 78vw !important;
+            max-width: 320px !important;
+        }
+    }
+
     h1, h2, h3, h4 {
         color: var(--white) !important;
     }
@@ -347,10 +357,45 @@ def render_copyright_footer():
 
 
 # ----------------------------------------------------------------------
+# Navigation callbacks
+# ----------------------------------------------------------------------
+# IMPORTANT: the sidebar's navigation radio (key="nav_choice") is created
+# once per run, near the start of main(), before any page content renders.
+# Because of that, page content can NOT directly reassign
+# st.session_state.nav_choice later in that same run — Streamlit raises
+# StreamlitAPIException: "cannot be modified after the widget ... is
+# instantiated." The fix is to only change nav_choice from a widget
+# on_click callback, since callbacks run *before* the next rerun
+# recreates the sidebar widget, which is allowed.
+def _go_to_register():
+    st.session_state.nav_choice = "Register"
+
+
+def _go_to_home_after_registration():
+    st.session_state.registration_submitted = False
+    st.session_state.last_registered_name = ""
+    st.session_state.nav_choice = "Home"
+
+
+def _register_another_student():
+    st.session_state.registration_submitted = False
+    st.session_state.last_registered_name = ""
+
+
+# ----------------------------------------------------------------------
 # HOME PAGE
 # ----------------------------------------------------------------------
 def render_home_page():
     render_hero()
+
+    top_col1, top_col2, top_col3 = st.columns([1, 2, 1])
+    with top_col2:
+        st.button(
+            "📝 Register Now",
+            use_container_width=True,
+            on_click=_go_to_register,
+            key="home_top_register_button",
+        )
 
     st.markdown(
         f"""
@@ -399,12 +444,21 @@ def render_home_page():
         """
         <div class="cb-section">
             <h3>Ready to Join?</h3>
-            <p>Head over to the <strong>Register</strong> page from the sidebar
-            to secure your spot in this semester's Coddy Buddy program.</p>
+            <p>Secure your spot in this semester's Coddy Buddy program — takes less
+            than two minutes.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    reg_col1, reg_col2, reg_col3 = st.columns([1, 2, 1])
+    with reg_col2:
+        st.button(
+            "📝 Register Now",
+            use_container_width=True,
+            on_click=_go_to_register,
+            key="home_bottom_register_button",
+        )
 
     render_contact_footer()
 
@@ -432,17 +486,18 @@ def render_registration_success():
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("➕ Register Another Student", use_container_width=True):
-            st.session_state.registration_submitted = False
-            st.session_state.last_registered_name = ""
-            st.rerun()
+        st.button(
+            "➕ Register Another Student",
+            use_container_width=True,
+            on_click=_register_another_student,
+        )
 
     with col2:
-        if st.button("🏠 Return to Home", use_container_width=True):
-            st.session_state.registration_submitted = False
-            st.session_state.last_registered_name = ""
-            st.session_state.nav_choice = "Home"
-            st.rerun()
+        st.button(
+            "🏠 Return to Home",
+            use_container_width=True,
+            on_click=_go_to_home_after_registration,
+        )
 
     st.caption("All done? You can safely close this tab at any time.")
 
