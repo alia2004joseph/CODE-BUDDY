@@ -352,43 +352,59 @@ def render_copyright_footer():
 def render_home_page():
     render_hero()
 
-    st.markdown('<div class="cb-section">', unsafe_allow_html=True)
-    st.markdown("### About Coddy Buddy")
-    st.write(PROGRAM_INTRO)
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="cb-section">
+            <h3>About Coddy Buddy</h3>
+            <p>{PROGRAM_INTRO}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown('<div class="cb-section">', unsafe_allow_html=True)
-        st.markdown("### What You'll Learn")
         pills = "".join(
             f'<span class="cb-pill">{tech}</span>' for tech in TECHNOLOGIES_TAUGHT
         )
-        st.markdown(pills, unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(
+            f"""
+            <div class="cb-section">
+                <h3>What You'll Learn</h3>
+                <div>{pills}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     with col2:
-        st.markdown('<div class="cb-section">', unsafe_allow_html=True)
-        st.markdown("### Why Join")
         st.markdown(
             """
-            - Build real, practical web applications from scratch
-            - Learn directly alongside fellow CEDAT engineering students
-            - Get hands-on experience with modern, in-demand tools
-            - Understand how software can solve real engineering problems
-            - Join a supportive, student-led learning community
-            """
+            <div class="cb-section">
+                <h3>Why Join</h3>
+                <ul>
+                    <li>Build real, practical web applications from scratch</li>
+                    <li>Learn directly alongside fellow CEDAT engineering students</li>
+                    <li>Get hands-on experience with modern, in-demand tools</li>
+                    <li>Understand how software can solve real engineering problems</li>
+                    <li>Join a supportive, student-led learning community</li>
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown('<div class="cb-section">', unsafe_allow_html=True)
-    st.markdown("### Ready to Join?")
-    st.write(
-        "Head over to the **Register** page from the sidebar to secure your spot "
-        "in this semester's Coddy Buddy program."
+    st.markdown(
+        """
+        <div class="cb-section">
+            <h3>Ready to Join?</h3>
+            <p>Head over to the <strong>Register</strong> page from the sidebar
+            to secure your spot in this semester's Coddy Buddy program.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
     render_contact_footer()
 
@@ -432,12 +448,11 @@ def render_registration_success():
 
 
 def render_registration_form():
-    st.markdown('<div class="cb-hero">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="cb-title" style="font-size:2rem;">Register for Coddy Buddy</div>',
+        '<div class="cb-hero"><div class="cb-title" style="font-size:2rem;">'
+        "Register for Coddy Buddy</div></div>",
         unsafe_allow_html=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
 
     with st.form("registration_form", clear_on_submit=False):
         st.markdown("#### Personal Information")
