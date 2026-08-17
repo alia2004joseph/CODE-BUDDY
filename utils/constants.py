@@ -20,6 +20,7 @@ PROGRAM_FREE_TEXT = "FREE OF CHARGE"
 
 PROGRAM_LEAD_NAME = "Alia Joseph"
 PROGRAM_LEAD_WHATSAPP = "0744 215 379"
+COMMUNITY_WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/Kdq47XMq6Ix65qIkvgR1gk?s=cl&p=a&ilr=4"
 
 COPYRIGHT_TEXT = f"© {{year}} Coddy Buddy. Designed by {PROGRAM_LEAD_NAME}. All rights reserved."
 
@@ -118,7 +119,6 @@ SHEET_HEADERS = [
     "Full Name",
     "Phone Number",
     "Email",
-    "Country",
     "Student Status",
     "Institution",
     "Field/Program",

@@ -9,6 +9,7 @@ from datetime import datetime
 import streamlit as st
 
 from utils.constants import (
+    COMMUNITY_WHATSAPP_GROUP_LINK,
     COPYRIGHT_TEXT,
     LEARNING_PATH,
     MSG_DUPLICATE_REGISTRATION,
@@ -71,14 +72,67 @@ h1,h2,h3,h4,p,li,label { color: var(--white) !important; }
 .cb-pill { display:inline-block; padding: .35rem .75rem; margin: .25rem .25rem 0 0; border-radius: 999px; background: rgba(34,211,238,.12); color: var(--cyan); border: 1px solid rgba(34,211,238,.25); }
 .stButton > button, div[data-testid="stFormSubmitButton"] > button { width:100%; background: linear-gradient(90deg, var(--cyan), var(--green)) !important; color:#04141f !important; font-weight:800 !important; border:none !important; border-radius: 12px !important; }
 .cb-success { text-align:center; padding: 1.8rem; border-radius: 18px; border: 1px solid rgba(52,211,153,.4); background: rgba(52,211,153,.08); }
+.cb-whatsapp-box { margin: 1.4rem auto 0.6rem; max-width: 520px; padding: 1.1rem 1.2rem; border-radius: 16px; background: rgba(37,211,102,.10); border: 1px solid rgba(37,211,102,.45); }
+.cb-whatsapp-box p { margin: 0 0 0.9rem; }
+.cb-whatsapp-btn { display:inline-block; padding: 0.85rem 1.8rem; border-radius: 999px; background: #25D366; color: #04140c !important; font-weight: 800; text-decoration: none !important; font-size: 1.05rem; box-shadow: 0 4px 14px rgba(37,211,102,.35); transition: transform .12s ease; }
+.cb-whatsapp-btn:hover { transform: translateY(-2px); }
+
+/* Fix: form field text was inheriting the page's white text color and
+   landing on a light input background, making it invisible while typing.
+   Force a readable dark text color (and background) on every input type. */
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea,
+div[data-testid="stNumberInput"] input,
+div[data-testid="stDateInput"] input {
+    color: #0f172a !important;
+    background-color: #f8fafc !important;
+    caret-color: #0f172a !important;
+    border: 1px solid var(--border) !important;
+}
+div[data-testid="stTextInput"] input::placeholder,
+div[data-testid="stTextArea"] textarea::placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+}
+/* Selectbox / multiselect (built on BaseWeb) */
+div[data-baseweb="select"] > div {
+    background-color: #f8fafc !important;
+    color: #0f172a !important;
+    border-color: var(--border) !important;
+}
+div[data-baseweb="select"] input {
+    color: #0f172a !important;
+}
+div[data-baseweb="select"] span {
+    color: #0f172a !important;
+}
+/* Dropdown menu / options list */
+ul[data-baseweb="menu"] li,
+li[role="option"] {
+    color: #0f172a !important;
+    background-color: #f8fafc !important;
+}
+/* Multiselect selected-item tags */
+span[data-baseweb="tag"] {
+    color: #04141f !important;
+    background-color: rgba(34,211,238,.35) !important;
+}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 def _is_secret_admin_entry() -> bool:
-    params = st.query_params
-    return params.get("admin") == "1" or params.get("admin") == ["1"]
+    """
+    True only when the site is opened with the private admin query param,
+    e.g. https://your-app-url/?admin=<key>
+
+    The expected value defaults to "1" but can be overridden with
+    `admin_url_key` in secrets.toml so the URL isn't guessable.
+    """
+    expected = str(st.secrets.get("admin_url_key", "1"))
+    value = st.query_params.get("admin")
+    return value == expected
 
 
 def render_hero():
@@ -185,14 +239,20 @@ def contact_page():
 
 
 def success_screen():
+    name = st.session_state.get("last_registered_name", "").strip()
+    greeting = f"Welcome to Coddy Buddy, {name}!" if name else "Welcome to Coddy Buddy!"
     st.markdown(
         f"""
         <div class="cb-success">
-            <h2>🎉 REGISTRATION SUCCESSFUL</h2>
-            <h3>Welcome to Coddy Buddy!</h3>
-            <p>You have successfully registered for the Full-Stack Web Application Development Program.</p>
+            <h2>🎉 Welcome to Coddy Buddy!</h2>
+            <h3>{greeting}</h3>
+            <p>Your registration was successful.</p>
             <p><strong>{PROGRAM_SCHEDULE}</strong><br><strong>{PROGRAM_TIME}</strong><br>{PROGRAM_VENUE}<br><strong>{PROGRAM_FREE_TEXT}</strong></p>
             <p><strong>Learn. Build. Innovate.</strong><br>Coding with {PROGRAM_LEAD_NAME}<br>WhatsApp: {PROGRAM_LEAD_WHATSAPP}</p>
+            <div class="cb-whatsapp-box">
+                <p>📱 Join the official Coddy Buddy WhatsApp group to receive announcements, updates, learning materials and information about our Saturday sessions.</p>
+                <a class="cb-whatsapp-btn" href="{COMMUNITY_WHATSAPP_GROUP_LINK}" target="_blank" rel="noopener noreferrer">👉 JOIN THE WHATSAPP GROUP</a>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -213,7 +273,6 @@ def register_page():
         full_name = st.text_input("Full Name")
         phone_number = st.text_input("WhatsApp / Phone Number")
         email = st.text_input("Email Address")
-        country = st.text_input("Country")
 
         st.markdown("### Background")
         student_status = st.radio("Are you currently a student?", STUDENT_OPTIONS, horizontal=True)
@@ -255,7 +314,6 @@ def register_page():
         "full_name": full_name,
         "phone_number": phone_number,
         "email": email,
-        "country": country,
         "student_status": student_status,
         "institution": institution,
         "field_program": field_program,
@@ -284,7 +342,6 @@ def register_page():
             "Full Name": full_name.strip(),
             "Phone Number": phone_number.strip(),
             "Email": email.strip(),
-            "Country": country.strip(),
             "Student Status": student_status,
             "Institution": institution.strip(),
             "Field/Program": field_program.strip(),
@@ -367,6 +424,14 @@ def admin_page():
 
 
 def main():
+    # Private admin entry point: when the URL contains the secret ?admin=...
+    # query param, show ONLY the admin dashboard - no public nav, no other
+    # pages. This must be checked before anything else is rendered.
+    if _is_secret_admin_entry():
+        admin_page()
+        st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
+        return
+
     if "page" not in st.session_state:
         st.session_state.page = "Home"
     if "registration_submitted" not in st.session_state:
@@ -388,8 +453,6 @@ def main():
         register_page()
     elif st.session_state.page == "Contact":
         contact_page()
-    elif _is_secret_admin_entry():
-        admin_page()
 
     st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
 

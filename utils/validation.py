@@ -48,9 +48,6 @@ def validate_registration_form(form_data: dict) -> list:
     elif not is_valid_email(email):
         errors.append("Please enter a valid email address.")
 
-    if not is_non_empty(form_data.get("country", "")):
-        errors.append("Country is required.")
-
     if form_data.get("student_status") == "Yes":
         if not is_non_empty(form_data.get("institution", "")):
             errors.append("Institution is required for students.")
