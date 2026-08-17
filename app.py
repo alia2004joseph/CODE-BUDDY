@@ -1,27 +1,23 @@
 """
 app.py
 
-Main entry point for the Coddy Buddy CEDAT Registration Web Application.
-
-Pages:
-    - Home    : information about the program
-    - Register: the student registration form
-    - Admin   : password-protected dashboard for organizers
-
-Run locally with:
-    streamlit run app.py
+Main entry point for the Coddy Buddy Community Portal.
 """
 
-import streamlit as st
 from datetime import datetime
 
+import pandas as pd
+import streamlit as st
+
 from utils.constants import (
-    ATTENDANCE_OPTIONS,
     COPYRIGHT_TEXT,
-    ENGINEERING_PROGRAMS,
+    LEARNING_PATH,
     MSG_DUPLICATE_REGISTRATION,
     MSG_MISSING_CONFIG,
     MSG_SERVICE_UNAVAILABLE,
+    PROGRAM_DESCRIPTION,
+    PROGRAM_FOCUS,
+    PROGRAM_FREE_TEXT,
     PROGRAM_INTRO,
     PROGRAM_LEAD_NAME,
     PROGRAM_LEAD_WHATSAPP,
@@ -29,521 +25,229 @@ from utils.constants import (
     PROGRAM_SCHEDULE,
     PROGRAM_TAGLINE,
     PROGRAM_TIME,
-    PROGRAMMING_EXPERIENCE_LEVELS,
+    PROGRAM_VENUE,
+    PROJECT_EXAMPLES,
     REFERRAL_SOURCES,
+    SHEET_HEADERS,
+    SATURDAY_OPTIONS,
+    STUDENT_OPTIONS,
     TECHNOLOGIES_KNOWN,
     TECHNOLOGIES_TAUGHT,
-    YEARS_OF_STUDY,
+    PROGRAMMING_EXPERIENCE_LEVELS,
+    WHO_CAN_JOIN,
 )
 from utils.google_sheets import (
     GoogleSheetsError,
     add_registration,
     get_all_registrations,
-    get_statistics,
+    get_summary_tables,
     is_duplicate_registration,
 )
 from utils.validation import validate_registration_form
 
-# ----------------------------------------------------------------------
-# Page configuration
-# ----------------------------------------------------------------------
 st.set_page_config(
-    page_title="Coddy Buddy | CEDAT Registration",
+    page_title="Coddy Buddy | Community Portal",
     page_icon="💻",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-# ----------------------------------------------------------------------
-# Global styling
-# ----------------------------------------------------------------------
 CUSTOM_CSS = """
 <style>
-    :root {
-        --navy: #0a1a2f;
-        --navy-light: #10233d;
-        --cyan: #22d3ee;
-        --cyan-dark: #0891b2;
-        --green: #34d399;
-        --white: #f8fafc;
-    }
-
-    .stApp {
-        background: radial-gradient(circle at top left, var(--navy-light), var(--navy) 60%);
-        color: var(--white);
-    }
-
-    section[data-testid="stSidebar"] {
-        background-color: #071120;
-        border-right: 1px solid rgba(34, 211, 238, 0.15);
-    }
-
-    section[data-testid="stSidebar"] * {
-        color: var(--white) !important;
-    }
-
-    /* Keep the sidebar from swallowing the whole screen on narrow/mobile
-       viewports, where Streamlit otherwise expands it near full-width. */
-    @media (max-width: 640px) {
-        section[data-testid="stSidebar"] {
-            width: 78vw !important;
-            min-width: 78vw !important;
-            max-width: 320px !important;
-        }
-    }
-
-    h1, h2, h3, h4 {
-        color: var(--white) !important;
-    }
-
-    .cb-hero {
-        text-align: center;
-        padding: 2.5rem 1rem 1.5rem 1rem;
-    }
-
-    .cb-hero .cb-title {
-        font-size: 2.8rem;
-        font-weight: 800;
-        letter-spacing: 2px;
-        background: linear-gradient(90deg, var(--cyan), var(--green));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.2rem;
-    }
-
-    .cb-hero .cb-subtitle {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: var(--white);
-        letter-spacing: 1px;
-    }
-
-    .cb-hero .cb-audience {
-        font-size: 1rem;
-        color: #94a3b8;
-        letter-spacing: 1px;
-        margin-bottom: 0.8rem;
-    }
-
-    .cb-tagline {
-        display: inline-block;
-        margin-top: 0.5rem;
-        padding: 0.4rem 1.2rem;
-        border: 1px solid var(--cyan);
-        border-radius: 999px;
-        color: var(--cyan);
-        font-weight: 700;
-        letter-spacing: 3px;
-        font-size: 0.85rem;
-    }
-
-    .cb-section {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        border-radius: 14px;
-        padding: 1.6rem;
-        margin-bottom: 1.4rem;
-    }
-
-    .cb-section h3 {
-        color: var(--cyan) !important;
-        margin-top: 0;
-    }
-
-    .cb-schedule-badge {
-        display: inline-block;
-        background: linear-gradient(90deg, var(--cyan-dark), var(--green));
-        color: #04141f;
-        font-weight: 800;
-        letter-spacing: 2px;
-        padding: 0.6rem 1.4rem;
-        border-radius: 10px;
-        font-size: 1.1rem;
-        margin: 0.6rem 0;
-    }
-
-    .cb-contact {
-        text-align: center;
-        margin-top: 1rem;
-        padding: 1.2rem;
-        border-top: 1px solid rgba(148, 163, 184, 0.2);
-    }
-
-    .cb-contact .lead-name {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: var(--green);
-    }
-
-    .cb-pill {
-        display: inline-block;
-        background: rgba(34, 211, 238, 0.12);
-        border: 1px solid rgba(34, 211, 238, 0.35);
-        color: var(--cyan);
-        padding: 0.3rem 0.8rem;
-        border-radius: 999px;
-        margin: 0.2rem;
-        font-size: 0.85rem;
-    }
-
-    .stButton > button,
-    div[data-testid="stFormSubmitButton"] > button {
-        background: linear-gradient(90deg, var(--cyan-dark), var(--green)) !important;
-        color: #04141f !important;
-        font-weight: 700 !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 0.6rem 1.4rem !important;
-        letter-spacing: 0.5px !important;
-        width: 100%;
-    }
-
-    .stButton > button p,
-    div[data-testid="stFormSubmitButton"] > button p {
-        color: #04141f !important;
-        font-weight: 700 !important;
-    }
-
-    .stButton > button:hover,
-    div[data-testid="stFormSubmitButton"] > button:hover {
-        opacity: 0.88 !important;
-        color: #04141f !important;
-    }
-
-    .stButton > button:hover p,
-    div[data-testid="stFormSubmitButton"] > button:hover p {
-        color: #04141f !important;
-    }
-
-    div[data-testid="stForm"] {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(148, 163, 184, 0.15);
-        border-radius: 14px;
-        padding: 1.5rem;
-    }
-
-    .cb-success-box {
-        text-align: center;
-        padding: 2rem;
-        border-radius: 14px;
-        background: rgba(52, 211, 153, 0.08);
-        border: 1px solid rgba(52, 211, 153, 0.4);
-    }
-
-    .cb-copyright {
-        text-align: center;
-        margin-top: 2.5rem;
-        padding-top: 1.2rem;
-        border-top: 1px solid rgba(148, 163, 184, 0.15);
-        color: #64748b;
-        font-size: 0.8rem;
-        letter-spacing: 0.3px;
-    }
-
-    /* --- Form label & input contrast fixes --- */
-
-    /* Widget labels (Full Name, Registration Number, etc.) */
-    div[data-testid="stForm"] label,
-    div[data-testid="stForm"] p,
-    div[data-testid="stWidgetLabel"] p,
-    .stTextInput label p,
-    .stTextArea label p,
-    .stSelectbox label p,
-    .stMultiSelect label p,
-    .stRadio label p {
-        color: var(--white) !important;
-        font-weight: 600 !important;
-        opacity: 1 !important;
-    }
-
-    /* Text input & text area fields: white background, dark readable text */
-    div[data-testid="stForm"] input[type="text"],
-    div[data-testid="stForm"] input[type="password"],
-    div[data-testid="stForm"] textarea {
-        background-color: #ffffff !important;
-        color: #0a1a2f !important;
-        border: 1px solid rgba(148, 163, 184, 0.4) !important;
-        border-radius: 8px !important;
-    }
-
-    div[data-testid="stForm"] input[type="text"]::placeholder,
-    div[data-testid="stForm"] input[type="password"]::placeholder,
-    div[data-testid="stForm"] textarea::placeholder {
-        color: #64748b !important;
-        opacity: 1 !important;
-    }
-
-    /* Selectbox / multiselect closed control */
-    div[data-testid="stForm"] div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #0a1a2f !important;
-        border: 1px solid rgba(148, 163, 184, 0.4) !important;
-        border-radius: 8px !important;
-    }
-
-    div[data-testid="stForm"] div[data-baseweb="select"] span {
-        color: #0a1a2f !important;
-    }
-
-    /* Selectbox dropdown menu (rendered in a portal, outside the form) */
-    div[data-baseweb="popover"] li,
-    div[data-baseweb="menu"] li {
-        color: #0a1a2f !important;
-        background-color: #ffffff !important;
-    }
-
-    /* Multiselect selected-item tags */
-    div[data-testid="stForm"] span[data-baseweb="tag"] {
-        background-color: var(--cyan-dark) !important;
-        color: #ffffff !important;
-    }
-
-    /* Radio button option text */
-    div[data-testid="stForm"] div[role="radiogroup"] label span,
-    div[data-testid="stForm"] div[role="radiogroup"] p {
-        color: var(--white) !important;
-    }
-
-    /* Section subheadings inside the form (#### Personal Information, etc.) */
-    div[data-testid="stForm"] h4 {
-        color: var(--cyan) !important;
-        margin-top: 1.2rem;
-    }
+:root {
+    --navy: #07111f;
+    --navy-2: #0c1d33;
+    --card: rgba(255,255,255,0.05);
+    --border: rgba(34, 211, 238, 0.18);
+    --cyan: #22d3ee;
+    --green: #34d399;
+    --white: #f8fafc;
+}
+.stApp { background: linear-gradient(180deg, var(--navy-2), var(--navy)); color: var(--white); }
+h1,h2,h3,h4,p,li,label { color: var(--white) !important; }
+.cb-hero { padding: 2rem 0 1rem; text-align:center; }
+.cb-title { font-size: 3rem; font-weight: 900; letter-spacing: 2px; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.cb-subtitle { font-size: 1.2rem; font-weight: 700; }
+.cb-desc { color: #cbd5e1; max-width: 860px; margin: 0 auto; }
+.cb-section { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem; margin: 0.9rem 0; }
+.cb-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 1rem; height: 100%; }
+.cb-pill { display:inline-block; padding: .35rem .75rem; margin: .25rem .25rem 0 0; border-radius: 999px; background: rgba(34,211,238,.12); color: var(--cyan); border: 1px solid rgba(34,211,238,.25); }
+.cb-cta button, .stButton > button, div[data-testid="stFormSubmitButton"] > button { width:100%; background: linear-gradient(90deg, var(--cyan), var(--green)) !important; color:#04141f !important; font-weight:800 !important; border:none !important; border-radius: 12px !important; }
+.cb-success { text-align:center; padding: 1.8rem; border-radius: 18px; border: 1px solid rgba(52,211,153,.4); background: rgba(52,211,153,.08); }
+.cb-table { background: rgba(255,255,255,.03); border-radius: 12px; padding: .75rem; border: 1px solid rgba(148,163,184,.15); }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
-# ----------------------------------------------------------------------
-# Shared UI fragments
-# ----------------------------------------------------------------------
 def render_hero():
     st.markdown(
         f"""
         <div class="cb-hero">
             <div class="cb-title">{PROGRAM_NAME}</div>
-            <div class="cb-subtitle">Web Application Development</div>
-            <div class="cb-audience">FOR CEDAT ENGINEERING STUDENTS</div>
-            <div class="cb-tagline">{PROGRAM_TAGLINE}</div>
+            <div class="cb-subtitle">{PROGRAM_TAGLINE}</div>
+            <p class="cb-desc">{PROGRAM_INTRO}</p>
+            <p><strong>{PROGRAM_DESCRIPTION}</strong> · {PROGRAM_FOCUS}</p>
+            <p><strong>No prior programming experience is required.</strong></p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def render_contact_footer():
-    st.markdown(
-        f"""
-        <div class="cb-contact">
-            <div class="cb-schedule-badge">{PROGRAM_SCHEDULE} · {PROGRAM_TIME}</div>
-            <p class="lead-name">Coding with {PROGRAM_LEAD_NAME}</p>
-            <p>WhatsApp: {PROGRAM_LEAD_WHATSAPP}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+def render_nav():
+    return st.radio(
+        "Navigate",
+        ["Home", "About", "Program", "Projects", "Register", "Contact", "Admin"],
+        horizontal=True,
+        label_visibility="collapsed",
     )
 
 
-def render_copyright_footer():
-    current_year = datetime.now().year
-    st.markdown(
-        f"""
-        <div class="cb-copyright">
-            {COPYRIGHT_TEXT.format(year=current_year)}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+def render_card(title, body):
+    st.markdown(f'<div class="cb-card"><h3>{title}</h3>{body}</div>', unsafe_allow_html=True)
 
 
-# ----------------------------------------------------------------------
-# Navigation callbacks
-# ----------------------------------------------------------------------
-# IMPORTANT: the sidebar's navigation radio (key="nav_choice") is created
-# once per run, near the start of main(), before any page content renders.
-# Because of that, page content can NOT directly reassign
-# st.session_state.nav_choice later in that same run — Streamlit raises
-# StreamlitAPIException: "cannot be modified after the widget ... is
-# instantiated." The fix is to only change nav_choice from a widget
-# on_click callback, since callbacks run *before* the next rerun
-# recreates the sidebar widget, which is allowed.
-def _go_to_register():
-    st.session_state.nav_choice = "Register"
+def go_register():
+    st.session_state.page = "Register"
 
 
-def _go_to_home_after_registration():
-    st.session_state.registration_submitted = False
-    st.session_state.last_registered_name = ""
-    st.session_state.nav_choice = "Home"
-
-
-def _register_another_student():
-    st.session_state.registration_submitted = False
-    st.session_state.last_registered_name = ""
-
-
-# ----------------------------------------------------------------------
-# HOME PAGE
-# ----------------------------------------------------------------------
-def render_home_page():
+def home_page():
     render_hero()
+    c1, c2 = st.columns(2)
+    with c1:
+        st.button("🚀 JOIN CODDY BUDDY", use_container_width=True, on_click=go_register)
+    with c2:
+        if st.button("📚 Explore the Program", use_container_width=True):
+            st.session_state.page = "Program"
 
-    top_col1, top_col2, top_col3 = st.columns([1, 2, 1])
-    with top_col2:
-        st.button(
-            "📝 Register Now",
-            use_container_width=True,
-            on_click=_go_to_register,
-            key="home_top_register_button",
-        )
+    st.markdown("## Key Value")
+    a, b, c = st.columns(3)
+    with a:
+        render_card("🌱 LEARN", "Develop practical software development skills from beginner level.")
+    with b:
+        render_card("🚀 BUILD", "Turn ideas and real-world problems into working applications.")
+    with c:
+        render_card("🤝 COLLABORATE", "Learn with other students, developers and technology enthusiasts.")
 
+    st.markdown("## WHO IS CODDY BUDDY FOR?")
+    pills = "".join([f'<span class="cb-pill">{item}</span>' for item in WHO_CAN_JOIN])
+    st.markdown(f"<div class='cb-section'>{pills}<p><strong>NO PRIOR PROGRAMMING EXPERIENCE REQUIRED</strong></p></div>", unsafe_allow_html=True)
+
+    st.markdown("## THIS SEMESTER")
+    st.markdown(f"<div class='cb-section'><h3>{PROGRAM_FOCUS}</h3><p>{PROGRAM_SCHEDULE} | 10:00 AM – 12:00 PM | <strong>{PROGRAM_FREE_TEXT}</strong></p></div>", unsafe_allow_html=True)
+    path = "<br>↓<br>".join(LEARNING_PATH)
+    st.markdown(f"<div class='cb-section'><strong>{path}</strong></div>", unsafe_allow_html=True)
+
+    st.markdown("## YOU WON'T JUST LEARN CODE. YOU WILL BUILD.")
+    st.info("Coddy Buddy focuses on learning by doing. Participants will work on practical projects and learn how to turn ideas and real-world problems into software solutions.")
+    st.write("Examples of what participants could build:")
+    st.write(" • " + "\n • ".join(PROJECT_EXAMPLES))
+
+    st.markdown("## LEARN → PRACTICE → BUILD → COLLABORATE → DEPLOY")
+    st.write("Participants learn a concept, practice it, apply it to a project, collaborate with others, build complete applications, and eventually deploy their work.")
+
+    st.markdown("## WEEKLY SESSIONS")
+    st.markdown(f"<div class='cb-section'><h3>{PROGRAM_SCHEDULE}</h3><p><strong>⏰ {PROGRAM_TIME}</strong><br>📍 {PROGRAM_VENUE}<br>💰 <strong>{PROGRAM_FREE_TEXT}</strong></p></div>", unsafe_allow_html=True)
+
+
+def about_page():
+    st.markdown("## What is Coddy Buddy?")
+    st.write("Coddy Buddy is a student-led technology community focused on practical learning, collaboration and building real-world software solutions.")
+    st.write("It is designed to make software development more accessible to beginners while also giving experienced participants opportunities to collaborate, mentor and build.")
+    st.success("Learn → Build → Collaborate → Innovate")
+
+
+def program_page():
+    st.markdown(f"## CURRENT PROGRAM\n### {PROGRAM_FOCUS}")
+    stages = {
+        "Stage 1 — Foundations": ["HTML", "CSS", "JavaScript", "Git/GitHub"],
+        "Stage 2 — Frontend": ["React"],
+        "Stage 3 — Backend": ["Python", "Django", "Django REST Framework"],
+        "Stage 4 — Full Stack": ["React + DRF", "APIs", "Authentication", "Databases"],
+        "Stage 5 — Building": ["Team projects", "Deployment", "Project presentation"],
+    }
+    for title, items in stages.items():
+        st.markdown(f"### {title}")
+        st.write(" • " + "\n • ".join(items))
+
+
+def projects_page():
+    st.markdown("## BUILD REAL THINGS")
+    st.write("Participants will eventually work on practical projects across these categories:")
+    st.write(" • Education\n • Engineering\n • Business\n • Campus Life\n • Community\n • Productivity\n • Innovation")
+    st.success("Your idea could become the next Coddy Buddy project.")
+
+
+def contact_page():
+    st.markdown("## GET IN TOUCH")
+    st.write(f"**Program Lead:** {PROGRAM_LEAD_NAME}")
+    st.write(f"**WhatsApp:** {PROGRAM_LEAD_WHATSAPP}")
+    st.write(f"**Sessions:** {PROGRAM_SCHEDULE}, {PROGRAM_TIME}")
+    st.write(f"**Venue:** {PROGRAM_VENUE}")
+
+
+def success_screen(name: str):
     st.markdown(
         f"""
-        <div class="cb-section">
-            <h3>About Coddy Buddy</h3>
-            <p>{PROGRAM_INTRO}</p>
+        <div class="cb-success">
+            <h2>🎉 REGISTRATION SUCCESSFUL</h2>
+            <h3>Welcome to Coddy Buddy!</h3>
+            <p>You have successfully registered for the Full-Stack Web Application Development Program.</p>
+            <p><strong>{PROGRAM_SCHEDULE}</strong><br><strong>{PROGRAM_TIME}</strong><br>{PROGRAM_VENUE}<br><strong>{PROGRAM_FREE_TEXT}</strong></p>
+            <p><strong>Learn. Build. Innovate.</strong><br>Coding with {PROGRAM_LEAD_NAME}<br>WhatsApp: {PROGRAM_LEAD_WHATSAPP}</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    col1, col2 = st.columns(2)
 
-    with col1:
-        pills = "".join(
-            f'<span class="cb-pill">{tech}</span>' for tech in TECHNOLOGIES_TAUGHT
-        )
-        st.markdown(
-            f"""
-            <div class="cb-section">
-                <h3>What You'll Learn</h3>
-                <div>{pills}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+def register_page():
+    st.markdown("# JOIN CODDY BUDDY")
+    st.caption("Start your journey. Learn. Build. Innovate.")
+    st.info("The program is completely free of charge.")
 
-    with col2:
-        st.markdown(
-            """
-            <div class="cb-section">
-                <h3>Why Join</h3>
-                <ul>
-                    <li>Build real, practical web applications from scratch</li>
-                    <li>Learn directly alongside fellow CEDAT engineering students</li>
-                    <li>Get hands-on experience with modern, in-demand tools</li>
-                    <li>Understand how software can solve real engineering problems</li>
-                    <li>Join a supportive, student-led learning community</li>
-                </ul>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    if st.session_state.get("registration_submitted"):
+        success_screen(st.session_state.get("last_registered_name", ""))
+        return
 
-    st.markdown(
-        """
-        <div class="cb-section">
-            <h3>Ready to Join?</h3>
-            <p>Secure your spot in this semester's Coddy Buddy program — takes less
-            than two minutes.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with st.form("registration_form"):
+        st.markdown("### Personal Information")
+        full_name = st.text_input("Full Name")
+        phone_number = st.text_input("WhatsApp / Phone Number")
+        email = st.text_input("Email Address")
+        country = st.text_input("Country")
 
-    reg_col1, reg_col2, reg_col3 = st.columns([1, 2, 1])
-    with reg_col2:
-        st.button(
-            "📝 Register Now",
-            use_container_width=True,
-            on_click=_go_to_register,
-            key="home_bottom_register_button",
-        )
+        st.markdown("### Background")
+        student_status = st.radio("Are you currently a student?", STUDENT_OPTIONS, horizontal=True)
+        institution = ""
+        field_program = ""
+        year_of_study = ""
+        occupation_background = ""
+        if student_status == "Yes":
+            institution = st.text_input("Institution")
+            field_program = st.text_input("Field / Program of Study")
+            year_of_study = st.text_input("Year of Study")
+        else:
+            occupation_background = st.text_input("Occupation / Background")
 
-    render_contact_footer()
+        st.markdown("### Programming Experience")
+        programming_experience = st.selectbox("How would you describe your programming experience?", PROGRAMMING_EXPERIENCE_LEVELS)
 
+        st.markdown("### Technologies")
+        technologies_used = st.multiselect("Which technologies have you used before?", TECHNOLOGIES_KNOWN, default=["None"])
 
-# ----------------------------------------------------------------------
-# REGISTER PAGE
-# ----------------------------------------------------------------------
-def render_registration_success():
-    student_name = st.session_state.get("last_registered_name", "").strip()
-    greeting = f"Congratulations, {student_name}! 🎉" if student_name else "🎉 Registration Successful!"
+        st.markdown("### Motivation")
+        motivation = st.text_area("Why do you want to join Coddy Buddy?")
+        what_to_build = st.text_area("What would you like to build?")
+        goals = st.text_area("What are you hoping to achieve through Coddy Buddy?")
 
-    st.markdown(
-        f"""
-        <div class="cb-success-box">
-            <h2>{greeting}</h2>
-            <p>Welcome to Coddy Buddy — CEDAT.</p>
-            <p>You have successfully registered for the Web Application Development Program.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    render_contact_footer()
+        st.markdown("### Availability")
+        saturday_availability = st.radio("Can you attend the Saturday sessions?", SATURDAY_OPTIONS, horizontal=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.button(
-            "➕ Register Another Student",
-            use_container_width=True,
-            on_click=_register_another_student,
-        )
-
-    with col2:
-        st.button(
-            "🏠 Return to Home",
-            use_container_width=True,
-            on_click=_go_to_home_after_registration,
-        )
-
-    st.caption("All done? You can safely close this tab at any time.")
-
-
-def render_registration_form():
-    st.markdown(
-        '<div class="cb-hero"><div class="cb-title" style="font-size:2rem;">'
-        "Register for Coddy Buddy</div></div>",
-        unsafe_allow_html=True,
-    )
-
-    with st.form("registration_form", clear_on_submit=False):
-        st.markdown("#### Personal Information")
-        full_name = st.text_input("Full Name *")
-        registration_number = st.text_input("Registration Number *")
-        phone_number = st.text_input("WhatsApp / Phone Number *", placeholder="e.g. 0744 215 379")
-        email = st.text_input("Email Address *", placeholder="e.g. name@example.com")
-
-        st.markdown("#### Academic Information")
-        engineering_program = st.selectbox("Engineering Program *", ENGINEERING_PROGRAMS)
-        other_engineering_program = ""
-        if engineering_program == "Other":
-            other_engineering_program = st.text_input("Please specify your engineering program *")
-
-        year_of_study = st.selectbox("Year of Study *", YEARS_OF_STUDY)
-
-        st.markdown("#### Programming Background")
-        programming_experience = st.selectbox(
-            "Previous programming experience *", PROGRAMMING_EXPERIENCE_LEVELS
-        )
-        technologies_used = st.multiselect(
-            "Technologies previously used", TECHNOLOGIES_KNOWN, default=[]
-        )
-        how_heard = st.selectbox("How did you hear about Coddy Buddy?", REFERRAL_SOURCES)
-        other_referral_source = ""
-        if how_heard == "Other":
-            other_referral_source = st.text_input("Please specify how you heard about us *")
-
-        st.markdown("#### Motivation")
-        motivation = st.text_area("Why do you want to join Coddy Buddy? *")
-        engineering_problem = st.text_area(
-            "What engineering problem would you like to solve using software?"
-        )
-        saturday_availability = st.radio(
-            "Can you attend the Saturday sessions? *", ATTENDANCE_OPTIONS, horizontal=True
-        )
+        st.markdown("### Referral")
+        referral_source = st.selectbox("How did you hear about Coddy Buddy?", REFERRAL_SOURCES)
+        other_referral_source = st.text_input("If Other, please specify") if referral_source == "Other" else ""
 
         submitted = st.form_submit_button("Submit Registration")
 
@@ -552,19 +256,23 @@ def render_registration_form():
 
     form_data = {
         "full_name": full_name,
-        "registration_number": registration_number,
         "phone_number": phone_number,
         "email": email,
-        "engineering_program": engineering_program,
-        "other_engineering_program": other_engineering_program,
+        "country": country,
+        "student_status": student_status,
+        "institution": institution,
+        "field_program": field_program,
         "year_of_study": year_of_study,
+        "occupation_background": occupation_background,
         "programming_experience": programming_experience,
-        "how_heard": how_heard,
-        "other_referral_source": other_referral_source,
+        "technologies_used": technologies_used,
         "motivation": motivation,
+        "what_to_build": what_to_build,
+        "goals": goals,
         "saturday_availability": saturday_availability,
+        "referral_source": referral_source,
+        "other_referral_source": other_referral_source,
     }
-
     errors = validate_registration_form(form_data)
     if errors:
         for error in errors:
@@ -572,182 +280,111 @@ def render_registration_form():
         return
 
     try:
-        if is_duplicate_registration(registration_number):
+        if is_duplicate_registration(email, phone_number):
             st.warning(MSG_DUPLICATE_REGISTRATION)
             return
-
         row_data = {
             "Full Name": full_name.strip(),
-            "Registration Number": registration_number.strip(),
             "Phone Number": phone_number.strip(),
             "Email": email.strip(),
-            "Engineering Program": engineering_program,
-            "Other Engineering Program": other_engineering_program.strip(),
-            "Year of Study": year_of_study,
+            "Country": country.strip(),
+            "Student Status": student_status,
+            "Institution": institution.strip(),
+            "Field/Program": field_program.strip(),
+            "Year of Study": year_of_study.strip(),
+            "Occupation/Background": occupation_background.strip(),
             "Programming Experience": programming_experience,
             "Technologies Used": ", ".join(technologies_used),
-            "How They Heard": how_heard,
-            "Other Referral Source": other_referral_source.strip(),
             "Motivation": motivation.strip(),
-            "Engineering Problem": engineering_problem.strip(),
+            "What They Want to Build": what_to_build.strip(),
+            "Goals": goals.strip(),
             "Saturday Availability": saturday_availability,
+            "Referral Source": referral_source,
+            "Other Referral Source": other_referral_source.strip(),
         }
         add_registration(row_data)
         st.session_state.registration_submitted = True
         st.session_state.last_registered_name = full_name.strip()
         st.rerun()
-
     except GoogleSheetsError:
         st.error(MSG_SERVICE_UNAVAILABLE)
-    except Exception:  # noqa: BLE001
-        st.error(MSG_SERVICE_UNAVAILABLE)
 
 
-def render_register_page():
-    if st.session_state.get("registration_submitted"):
-        render_registration_success()
-    else:
-        render_registration_form()
-
-
-# ----------------------------------------------------------------------
-# ADMIN PAGE
-# ----------------------------------------------------------------------
-def check_admin_password() -> bool:
-    """Render a password prompt and return True once authenticated."""
-    if st.session_state.get("admin_authenticated"):
-        return True
-
-    st.markdown("### 🔒 Admin Login")
-
-    if "admin_password" not in st.secrets:
+def admin_page():
+    if not st.secrets.get("admin_password"):
         st.error(MSG_MISSING_CONFIG)
-        return False
-
-    with st.form("admin_login_form"):
-        password = st.text_input("Admin Password", type="password")
-        login_submitted = st.form_submit_button("Log In")
-
-    if login_submitted:
-        if password == st.secrets["admin_password"]:
+        return
+    if "admin_authenticated" not in st.session_state:
+        st.session_state.admin_authenticated = False
+    if not st.session_state.admin_authenticated:
+        with st.form("admin_login"):
+            password = st.text_input("Admin Password", type="password")
+            submitted = st.form_submit_button("Log In")
+        if submitted and password == st.secrets["admin_password"]:
             st.session_state.admin_authenticated = True
             st.rerun()
-        else:
+        elif submitted:
             st.error("Incorrect password. Please try again.")
+        return
 
-    return False
-
-
-def render_admin_dashboard():
-    st.markdown("### 📊 Admin Dashboard")
-
-    top_col1, top_col2 = st.columns([4, 1])
-    with top_col2:
-        if st.button("Log Out"):
-            st.session_state.admin_authenticated = False
-            st.rerun()
+    st.markdown("## Admin Dashboard")
+    if st.button("Log Out"):
+        st.session_state.admin_authenticated = False
+        st.rerun()
 
     try:
         df = get_all_registrations()
-    except GoogleSheetsError as exc:
+    except GoogleSheetsError:
         st.error(MSG_SERVICE_UNAVAILABLE)
-        # Safe to show technical detail here: this page is already
-        # password-protected, so only the authenticated admin sees it.
-        with st.expander("Technical details (admin only)"):
-            st.code(str(exc))
-            if exc.__cause__:
-                st.code(f"{type(exc.__cause__).__name__}: {exc.__cause__}")
-        return
-    except Exception as exc:  # noqa: BLE001
-        st.error(MSG_SERVICE_UNAVAILABLE)
-        with st.expander("Technical details (admin only)"):
-            st.code(f"{type(exc).__name__}: {exc}")
         return
 
-    stats = get_statistics(df)
-
-    if stats["total_students"] == 0:
-        st.info("No registrations yet. Check back once students start signing up.")
+    summary = get_summary_tables(df)
+    if summary["total"] == 0:
+        st.info("No registrations yet.")
         return
 
-    st.metric("Total Registered Students", stats["total_students"])
+    st.metric("Total registrations", summary["total"])
+    st.markdown("### Summary Tables")
+    for title, key in [
+        ("Students / Non-students", "students"),
+        ("Programming Experience", "experience"),
+        ("Saturday Availability", "availability"),
+        ("Referral Source", "referrals"),
+    ]:
+        st.markdown(f"#### {title}")
+        st.dataframe(summary[key], use_container_width=True, hide_index=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("#### By Engineering Program")
-        if not stats["by_program"].empty:
-            st.bar_chart(stats["by_program"])
-
-        st.markdown("#### By Year of Study")
-        if not stats["by_year"].empty:
-            st.bar_chart(stats["by_year"])
-
-        st.markdown("#### Saturday Availability")
-        if not stats["by_availability"].empty:
-            st.bar_chart(stats["by_availability"])
-
-    with col2:
-        st.markdown("#### By Programming Experience")
-        if not stats["by_experience"].empty:
-            st.bar_chart(stats["by_experience"])
-
-        st.markdown("#### Technologies Students Already Know")
-        if not stats["by_technology"].empty:
-            st.bar_chart(stats["by_technology"])
-
-    st.markdown("#### Registered Students")
-    st.dataframe(df, use_container_width=True)
-
-    csv_data = df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="⬇️ Download Registrations as CSV",
-        data=csv_data,
-        file_name="coddy_buddy_registrations.csv",
-        mime="text/csv",
-    )
+    st.markdown("### Registrations")
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.download_button("Download registrations as CSV", df.to_csv(index=False).encode("utf-8"), file_name="coddy_buddy_registrations.csv", mime="text/csv")
 
 
-def render_admin_page():
-    if check_admin_password():
-        render_admin_dashboard()
-
-
-# ----------------------------------------------------------------------
-# NAVIGATION / MAIN
-# ----------------------------------------------------------------------
 def main():
+    if "page" not in st.session_state:
+        st.session_state.page = "Home"
     if "registration_submitted" not in st.session_state:
         st.session_state.registration_submitted = False
-    if "admin_authenticated" not in st.session_state:
-        st.session_state.admin_authenticated = False
     if "last_registered_name" not in st.session_state:
         st.session_state.last_registered_name = ""
-    if "nav_choice" not in st.session_state:
-        st.session_state.nav_choice = "Home"
 
-    nav_options = ["Home", "Register", "Admin"]
+    st.session_state.page = render_nav()
 
-    with st.sidebar:
-        st.markdown(f"## {PROGRAM_NAME}")
-        st.caption(PROGRAM_TAGLINE)
-        page = st.radio(
-            "Navigate",
-            nav_options,
-            key="nav_choice",
-            label_visibility="collapsed",
-        )
-        st.markdown("---")
-        st.caption(f"Coding with {PROGRAM_LEAD_NAME}")
-        st.caption(f"WhatsApp: {PROGRAM_LEAD_WHATSAPP}")
+    if st.session_state.page == "Home":
+        home_page()
+    elif st.session_state.page == "About":
+        about_page()
+    elif st.session_state.page == "Program":
+        program_page()
+    elif st.session_state.page == "Projects":
+        projects_page()
+    elif st.session_state.page == "Register":
+        register_page()
+    elif st.session_state.page == "Contact":
+        contact_page()
+    else:
+        admin_page()
 
-    if page == "Home":
-        render_home_page()
-    elif page == "Register":
-        render_register_page()
-    elif page == "Admin":
-        render_admin_page()
-
-    render_copyright_footer()
+    st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
 
 
 if __name__ == "__main__":
