@@ -94,7 +94,7 @@ def render_hero():
 def render_nav():
     return st.radio(
         "Navigate",
-        ["Home", "About", "Program", "Projects", "Register", "Contact", "Admin"],
+        ["Home", "About", "Program", "Projects", "Register", "Contact"],
         horizontal=True,
         label_visibility="collapsed",
     )
@@ -303,8 +303,6 @@ def register_page():
 
 
 def admin_page():
-    # hidden entry: only reachable if the user knows the exact query parameter
-    # and also has the password; not shown in navigation.
     if not st.secrets.get("admin_password"):
         st.error(MSG_MISSING_CONFIG)
         return
@@ -312,13 +310,18 @@ def admin_page():
         st.session_state.admin_authenticated = False
     if not st.session_state.admin_authenticated:
         with st.form("admin_login"):
+            secret_code = st.text_input("Hidden Admin Access Code", type="password")
             password = st.text_input("Admin Password", type="password")
-            submitted = st.form_submit_button("Log In")
-        if submitted and password == st.secrets["admin_password"]:
-            st.session_state.admin_authenticated = True
-            st.rerun()
-        elif submitted:
-            st.error("Incorrect password. Please try again.")
+            submitted = st.form_submit_button("Open Admin Dashboard")
+        if submitted:
+            if secret_code != st.secrets.get("admin_access_code", ""):
+                st.error("Invalid access code.")
+                return
+            if password == st.secrets["admin_password"]:
+                st.session_state.admin_authenticated = True
+                st.rerun()
+            else:
+                st.error("Incorrect password. Please try again.")
         return
 
     st.markdown("## Admin Dashboard")
@@ -380,8 +383,6 @@ def main():
         register_page()
     elif st.session_state.page == "Contact":
         contact_page()
-    else:
-        admin_page()
 
     st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
 
