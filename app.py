@@ -76,6 +76,11 @@ h1,h2,h3,h4,p,li,label { color: var(--white) !important; }
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
+def _is_secret_admin_entry() -> bool:
+    params = st.query_params
+    return params.get("admin") == "1" or params.get("admin") == ["1"]
+
+
 def render_hero():
     st.markdown(
         f"""
@@ -383,6 +388,8 @@ def main():
         register_page()
     elif st.session_state.page == "Contact":
         contact_page()
+    elif _is_secret_admin_entry():
+        admin_page()
 
     st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
 
