@@ -6,7 +6,6 @@ Main entry point for the Coddy Buddy Community Portal.
 
 from datetime import datetime
 
-import pandas as pd
 import streamlit as st
 
 from utils.constants import (
@@ -28,13 +27,11 @@ from utils.constants import (
     PROGRAM_VENUE,
     PROJECT_EXAMPLES,
     REFERRAL_SOURCES,
-    SHEET_HEADERS,
     SATURDAY_OPTIONS,
     STUDENT_OPTIONS,
-    TECHNOLOGIES_KNOWN,
-    TECHNOLOGIES_TAUGHT,
     PROGRAMMING_EXPERIENCE_LEVELS,
     WHO_CAN_JOIN,
+    TECHNOLOGIES_KNOWN,
 )
 from utils.google_sheets import (
     GoogleSheetsError,
@@ -72,9 +69,8 @@ h1,h2,h3,h4,p,li,label { color: var(--white) !important; }
 .cb-section { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem; margin: 0.9rem 0; }
 .cb-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 1rem; height: 100%; }
 .cb-pill { display:inline-block; padding: .35rem .75rem; margin: .25rem .25rem 0 0; border-radius: 999px; background: rgba(34,211,238,.12); color: var(--cyan); border: 1px solid rgba(34,211,238,.25); }
-.cb-cta button, .stButton > button, div[data-testid="stFormSubmitButton"] > button { width:100%; background: linear-gradient(90deg, var(--cyan), var(--green)) !important; color:#04141f !important; font-weight:800 !important; border:none !important; border-radius: 12px !important; }
+.stButton > button, div[data-testid="stFormSubmitButton"] > button { width:100%; background: linear-gradient(90deg, var(--cyan), var(--green)) !important; color:#04141f !important; font-weight:800 !important; border:none !important; border-radius: 12px !important; }
 .cb-success { text-align:center; padding: 1.8rem; border-radius: 18px; border: 1px solid rgba(52,211,153,.4); background: rgba(52,211,153,.08); }
-.cb-table { background: rgba(255,255,255,.03); border-radius: 12px; padding: .75rem; border: 1px solid rgba(148,163,184,.15); }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -105,18 +101,14 @@ def render_nav():
 
 
 def render_card(title, body):
-    st.markdown(f'<div class="cb-card"><h3>{title}</h3>{body}</div>', unsafe_allow_html=True)
-
-
-def go_register():
-    st.session_state.page = "Register"
+    st.markdown(f'<div class="cb-card"><h3>{title}</h3><p>{body}</p></div>', unsafe_allow_html=True)
 
 
 def home_page():
     render_hero()
     c1, c2 = st.columns(2)
     with c1:
-        st.button("🚀 JOIN CODDY BUDDY", use_container_width=True, on_click=go_register)
+        st.button("🚀 JOIN CODDY BUDDY", use_container_width=True, on_click=lambda: st.session_state.update(page="Register"))
     with c2:
         if st.button("📚 Explore the Program", use_container_width=True):
             st.session_state.page = "Program"
@@ -135,14 +127,14 @@ def home_page():
     st.markdown(f"<div class='cb-section'>{pills}<p><strong>NO PRIOR PROGRAMMING EXPERIENCE REQUIRED</strong></p></div>", unsafe_allow_html=True)
 
     st.markdown("## THIS SEMESTER")
-    st.markdown(f"<div class='cb-section'><h3>{PROGRAM_FOCUS}</h3><p>{PROGRAM_SCHEDULE} | 10:00 AM – 12:00 PM | <strong>{PROGRAM_FREE_TEXT}</strong></p></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='cb-section'><h3>{PROGRAM_FOCUS}</h3><p>{PROGRAM_SCHEDULE} | {PROGRAM_TIME} | <strong>{PROGRAM_FREE_TEXT}</strong></p></div>", unsafe_allow_html=True)
     path = "<br>↓<br>".join(LEARNING_PATH)
     st.markdown(f"<div class='cb-section'><strong>{path}</strong></div>", unsafe_allow_html=True)
 
     st.markdown("## YOU WON'T JUST LEARN CODE. YOU WILL BUILD.")
     st.info("Coddy Buddy focuses on learning by doing. Participants will work on practical projects and learn how to turn ideas and real-world problems into software solutions.")
     st.write("Examples of what participants could build:")
-    st.write(" • " + "\n • ".join(PROJECT_EXAMPLES))
+    st.write("\n".join([f"• {item}" for item in PROJECT_EXAMPLES]))
 
     st.markdown("## LEARN → PRACTICE → BUILD → COLLABORATE → DEPLOY")
     st.write("Participants learn a concept, practice it, apply it to a project, collaborate with others, build complete applications, and eventually deploy their work.")
@@ -169,13 +161,13 @@ def program_page():
     }
     for title, items in stages.items():
         st.markdown(f"### {title}")
-        st.write(" • " + "\n • ".join(items))
+        st.write("\n".join([f"• {item}" for item in items]))
 
 
 def projects_page():
     st.markdown("## BUILD REAL THINGS")
     st.write("Participants will eventually work on practical projects across these categories:")
-    st.write(" • Education\n • Engineering\n • Business\n • Campus Life\n • Community\n • Productivity\n • Innovation")
+    st.write("\n".join([f"• {item}" for item in ["Education", "Engineering", "Business", "Campus Life", "Community", "Productivity", "Innovation"]]))
     st.success("Your idea could become the next Coddy Buddy project.")
 
 
@@ -187,7 +179,7 @@ def contact_page():
     st.write(f"**Venue:** {PROGRAM_VENUE}")
 
 
-def success_screen(name: str):
+def success_screen():
     st.markdown(
         f"""
         <div class="cb-success">
@@ -208,7 +200,7 @@ def register_page():
     st.info("The program is completely free of charge.")
 
     if st.session_state.get("registration_submitted"):
-        success_screen(st.session_state.get("last_registered_name", ""))
+        success_screen()
         return
 
     with st.form("registration_form"):
@@ -311,6 +303,8 @@ def register_page():
 
 
 def admin_page():
+    # hidden entry: only reachable if the user knows the exact query parameter
+    # and also has the password; not shown in navigation.
     if not st.secrets.get("admin_password"):
         st.error(MSG_MISSING_CONFIG)
         return
@@ -356,7 +350,12 @@ def admin_page():
 
     st.markdown("### Registrations")
     st.dataframe(df, use_container_width=True, hide_index=True)
-    st.download_button("Download registrations as CSV", df.to_csv(index=False).encode("utf-8"), file_name="coddy_buddy_registrations.csv", mime="text/csv")
+    st.download_button(
+        "Download registrations as CSV",
+        df.to_csv(index=False).encode("utf-8"),
+        file_name="coddy_buddy_registrations.csv",
+        mime="text/csv",
+    )
 
 
 def main():
