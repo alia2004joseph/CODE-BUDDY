@@ -1,10 +1,9 @@
-"""
-google_sheets.py
-
+"""google_sheets.py
 Handles all interaction with Google Sheets, which acts as the database
 for the Coddy Buddy Community Portal.
 """
 
+import re
 import time
 from datetime import datetime
 
@@ -67,10 +66,8 @@ def _get_client():
 def _get_spreadsheet():
     if "spreadsheet" not in st.secrets:
         raise GoogleSheetsError("Spreadsheet configuration is missing from secrets.")
-
     client = _get_client()
     spreadsheet_config = st.secrets["spreadsheet"]
-
     try:
         if spreadsheet_config.get("sheet_id"):
             return _call_with_retry(client.open_by_key, spreadsheet_config["sheet_id"])
@@ -80,7 +77,6 @@ def _get_spreadsheet():
         raise GoogleSheetsError("The configured Google Sheet could not be found.") from exc
     except Exception as exc:  # noqa: BLE001
         raise GoogleSheetsError("Could not open the Google Spreadsheet.") from exc
-
     raise GoogleSheetsError("No spreadsheet configuration was provided.")
 
 
@@ -98,7 +94,6 @@ def _get_worksheet():
             )
         except Exception as exc:  # noqa: BLE001
             raise GoogleSheetsError("Could not create the registrations worksheet.") from exc
-
     _ensure_headers(worksheet)
     return worksheet
 
@@ -108,7 +103,6 @@ def _ensure_headers(worksheet):
         existing_values = _call_with_retry(worksheet.get_all_values)
     except Exception as exc:  # noqa: BLE001
         raise GoogleSheetsError("Could not read the worksheet contents.") from exc
-
     if not existing_values:
         try:
             end_cell = gspread.utils.rowcol_to_a1(1, len(SHEET_HEADERS))
@@ -128,46 +122,69 @@ def get_all_registrations() -> pd.DataFrame:
         all_values = _call_with_retry(worksheet.get_all_values)
     except Exception as exc:  # noqa: BLE001
         raise GoogleSheetsError("Could not read registrations from Google Sheets.") from exc
-
     if not all_values or len(all_values) < 2:
         return pd.DataFrame(columns=SHEET_HEADERS)
-
     data_rows = all_values[1:]
     num_cols = len(SHEET_HEADERS)
     normalized_rows = []
-
     for row in data_rows:
         if not any((cell or "").strip() for cell in row):
             continue
         padded = row + [""] * (num_cols - len(row))
         normalized_rows.append(padded[:num_cols])
-
     if not normalized_rows:
         return pd.DataFrame(columns=SHEET_HEADERS)
-
     return pd.DataFrame(normalized_rows, columns=SHEET_HEADERS)
 
 
-def _normalize(value: str) -> str:
-    return str(value or "").strip().lower()
+def _normalize_email(email: str | None) -> str:
+    """Standardize email address for robust duplicate detection."""
+    return str(email or "").strip().lower()
+
+
+def _normalize_phone(phone: str | None) -> str:
+    """
+    Standardize phone number by removing spaces, dashes, formatting and
+    comparing the primary subscriber digits (e.g. last 9 digits).
+    """
+    if not phone:
+        return ""
+    digits = re.sub(r"\D", "", str(phone).strip())
+    if len(digits) >= 9:
+        return digits[-9:]
+    return digits
 
 
 def is_duplicate_registration(email: str, phone_number: str | None = None) -> bool:
+    """
+    Check whether a participant with the given email or phone number
+    has already registered.
+    """
     if not email and not phone_number:
         return False
-
     df = get_all_registrations()
     if df.empty:
         return False
 
+    norm_submitted_email = _normalize_email(email)
+    norm_submitted_phone = _normalize_phone(phone_number)
+
+    col_map = {col.strip().lower(): col for col in df.columns}
+    email_col = col_map.get("email") or col_map.get("email address")
+    phone_col = col_map.get("phone number") or col_map.get("whatsapp / phone number") or col_map.get("phone")
+
     email_match = False
     phone_match = False
 
-    if email and "Email" in df.columns:
-        email_match = _normalize(email) in set(df["Email"].astype(str).str.strip().str.lower())
+    if norm_submitted_email and email_col and email_col in df.columns:
+        existing_emails = {_normalize_email(e) for e in df[email_col].dropna().astype(str)}
+        existing_emails.discard("")
+        email_match = norm_submitted_email in existing_emails
 
-    if phone_number and "Phone Number" in df.columns:
-        phone_match = _normalize(phone_number) in set(df["Phone Number"].astype(str).str.strip().str.lower())
+    if norm_submitted_phone and phone_col and phone_col in df.columns:
+        existing_phones = {_normalize_phone(p) for p in df[phone_col].dropna().astype(str)}
+        existing_phones.discard("")
+        phone_match = norm_submitted_phone in existing_phones
 
     return email_match or phone_match
 
@@ -176,7 +193,6 @@ def add_registration(data: dict) -> None:
     worksheet = _get_worksheet()
     row = [data.get(header, "") for header in SHEET_HEADERS]
     row[0] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     try:
         existing_values = _call_with_retry(worksheet.get_all_values)
         next_row_number = len(existing_values) + 1
@@ -200,7 +216,6 @@ def get_summary_tables(df: pd.DataFrame) -> dict:
             "years": pd.DataFrame(),
             "technologies": pd.DataFrame(),
         }
-
     summary = {
         "total": len(df),
         "students": df.get("Student Status", pd.Series(dtype=str)).value_counts().reset_index(),
@@ -219,9 +234,7 @@ def get_summary_tables(df: pd.DataFrame) -> dict:
             .str.strip()
         ).value_counts().reset_index(),
     }
-
     for key, table in summary.items():
         if isinstance(table, pd.DataFrame) and not table.empty:
             table.columns = ["Value", "Count"]
-
     return summary

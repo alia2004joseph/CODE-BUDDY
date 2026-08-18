@@ -1,5 +1,4 @@
-"""
-app.py
+"""app.py
 
 Main entry point for the Coddy Buddy Community Portal.
 """
@@ -70,16 +69,15 @@ h1,h2,h3,h4,p,li,label { color: var(--white) !important; }
 .cb-section { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 1.2rem; margin: 0.9rem 0; }
 .cb-card { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 18px; padding: 1rem; height: 100%; }
 .cb-pill { display:inline-block; padding: .35rem .75rem; margin: .25rem .25rem 0 0; border-radius: 999px; background: rgba(34,211,238,.12); color: var(--cyan); border: 1px solid rgba(34,211,238,.25); }
-.stButton > button, div[data-testid="stFormSubmitButton"] > button { width:100%; background: linear-gradient(90deg, var(--cyan), var(--green)) !important; color:#04141f !important; font-weight:800 !important; border:none !important; border-radius: 12px !important; }
+.stButton > button, div[data-testid="stFormSubmitButton"] > button { width:100%; background: linear-gradient(90deg, var(--cyan), var(--green)) !important; color:#04141f !important; font-weight:800 !important; border:none !important; border-radius: 12px !important; transition: transform 0.1s ease, box-shadow 0.1s ease; }
+.stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(34,211,238,0.25); }
 .cb-success { text-align:center; padding: 1.8rem; border-radius: 18px; border: 1px solid rgba(52,211,153,.4); background: rgba(52,211,153,.08); }
 .cb-whatsapp-box { margin: 1.4rem auto 0.6rem; max-width: 520px; padding: 1.1rem 1.2rem; border-radius: 16px; background: rgba(37,211,102,.10); border: 1px solid rgba(37,211,102,.45); }
 .cb-whatsapp-box p { margin: 0 0 0.9rem; }
 .cb-whatsapp-btn { display:inline-block; padding: 0.85rem 1.8rem; border-radius: 999px; background: #25D366; color: #04140c !important; font-weight: 800; text-decoration: none !important; font-size: 1.05rem; box-shadow: 0 4px 14px rgba(37,211,102,.35); transition: transform .12s ease; }
 .cb-whatsapp-btn:hover { transform: translateY(-2px); }
 
-/* Fix: form field text was inheriting the page's white text color and
-   landing on a light input background, making it invisible while typing.
-   Force a readable dark text color (and background) on every input type. */
+/* Form inputs styling for high contrast and readability */
 div[data-testid="stTextInput"] input,
 div[data-testid="stTextArea"] textarea,
 div[data-testid="stNumberInput"] input,
@@ -94,7 +92,6 @@ div[data-testid="stTextArea"] textarea::placeholder {
     color: #64748b !important;
     opacity: 1 !important;
 }
-/* Selectbox / multiselect (built on BaseWeb) */
 div[data-baseweb="select"] > div {
     background-color: #f8fafc !important;
     color: #0f172a !important;
@@ -106,13 +103,11 @@ div[data-baseweb="select"] input {
 div[data-baseweb="select"] span {
     color: #0f172a !important;
 }
-/* Dropdown menu / options list */
 ul[data-baseweb="menu"] li,
 li[role="option"] {
     color: #0f172a !important;
     background-color: #f8fafc !important;
 }
-/* Multiselect selected-item tags */
 span[data-baseweb="tag"] {
     color: #04141f !important;
     background-color: rgba(34,211,238,.35) !important;
@@ -121,18 +116,25 @@ span[data-baseweb="tag"] {
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+NAV_PAGES = ["Home", "About", "Program", "Projects", "Register", "Contact"]
+
 
 def _is_secret_admin_entry() -> bool:
     """
     True only when the site is opened with the private admin query param,
     e.g. https://your-app-url/?admin=<key>
-
-    The expected value defaults to "1" but can be overridden with
-    `admin_url_key` in secrets.toml so the URL isn't guessable.
     """
     expected = str(st.secrets.get("admin_url_key", "1"))
     value = st.query_params.get("admin")
     return value == expected
+
+
+def navigate_to(page_name: str):
+    """Programmatically switch to a specific page and trigger an instant rerun."""
+    if page_name in NAV_PAGES:
+        st.session_state["page"] = page_name
+        st.session_state["nav_selection"] = page_name
+        st.rerun()
 
 
 def render_hero():
@@ -151,11 +153,27 @@ def render_hero():
 
 
 def render_nav():
+    """Render the top navigation radio bar, fully synced with session state."""
+    if "page" not in st.session_state:
+        st.session_state["page"] = "Home"
+
+    current_page = st.session_state["page"]
+    try:
+        current_idx = NAV_PAGES.index(current_page)
+    except ValueError:
+        current_idx = 0
+
+    def on_nav_change():
+        st.session_state["page"] = st.session_state.get("nav_selection", "Home")
+
     return st.radio(
         "Navigate",
-        ["Home", "About", "Program", "Projects", "Register", "Contact"],
+        NAV_PAGES,
+        index=current_idx,
+        key="nav_selection",
         horizontal=True,
         label_visibility="collapsed",
+        on_change=on_nav_change,
     )
 
 
@@ -165,12 +183,18 @@ def render_card(title, body):
 
 def home_page():
     render_hero()
-    c1, c2 = st.columns(2)
+
+    # Action buttons with reliable programmatic navigation
+    c1, c2, c3 = st.columns(3)
     with c1:
-        st.button("🚀 JOIN CODDY BUDDY", use_container_width=True, on_click=lambda: st.session_state.update(page="Register"))
+        if st.button("🚀 JOIN CODDY BUDDY", use_container_width=True, key="home_btn_join"):
+            navigate_to("Register")
     with c2:
-        if st.button("📚 Explore the Program", use_container_width=True):
-            st.session_state.page = "Program"
+        if st.button("📚 Explore the Program", use_container_width=True, key="home_btn_program"):
+            navigate_to("Program")
+    with c3:
+        if st.button("ℹ️ About Coddy Buddy", use_container_width=True, key="home_btn_about"):
+            navigate_to("About")
 
     st.markdown("## Key Value")
     a, b, c = st.columns(3)
@@ -193,7 +217,8 @@ def home_page():
     st.markdown("## YOU WON'T JUST LEARN CODE. YOU WILL BUILD.")
     st.info("Coddy Buddy focuses on learning by doing. Participants will work on practical projects and learn how to turn ideas and real-world problems into software solutions.")
     st.write("Examples of what participants could build:")
-    st.write("\n".join([f"• {item}" for item in PROJECT_EXAMPLES]))
+    for item in PROJECT_EXAMPLES:
+        st.markdown(f"- {item}")
 
     st.markdown("## LEARN → PRACTICE → BUILD → COLLABORATE → DEPLOY")
     st.write("Participants learn a concept, practice it, apply it to a project, collaborate with others, build complete applications, and eventually deploy their work.")
@@ -208,9 +233,19 @@ def about_page():
     st.write("It is designed to make software development more accessible to beginners while also giving experienced participants opportunities to collaborate, mentor and build.")
     st.success("Learn → Build → Collaborate → Innovate")
 
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🚀 Join Coddy Buddy Now", use_container_width=True, key="about_btn_reg"):
+            navigate_to("Register")
+    with c2:
+        if st.button("📚 View Full Curriculum", use_container_width=True, key="about_btn_prog"):
+            navigate_to("Program")
+
 
 def program_page():
-    st.markdown(f"## CURRENT PROGRAM\n### {PROGRAM_FOCUS}")
+    st.markdown("## CURRENT PROGRAM")
+    st.markdown(f"### {PROGRAM_FOCUS}")
     stages = {
         "Stage 1 — Foundations": ["HTML", "CSS", "JavaScript", "Git/GitHub"],
         "Stage 2 — Frontend": ["React"],
@@ -220,14 +255,25 @@ def program_page():
     }
     for title, items in stages.items():
         st.markdown(f"### {title}")
-        st.write("\n".join([f"• {item}" for item in items]))
+        for item in items:
+            st.markdown(f"- {item}")
+
+    st.markdown("---")
+    if st.button("🚀 Ready to Build? Join Coddy Buddy", use_container_width=True, key="prog_btn_reg"):
+        navigate_to("Register")
 
 
 def projects_page():
     st.markdown("## BUILD REAL THINGS")
     st.write("Participants will eventually work on practical projects across these categories:")
-    st.write("\n".join([f"• {item}" for item in ["Education", "Engineering", "Business", "Campus Life", "Community", "Productivity", "Innovation"]]))
+    categories = ["Education", "Engineering", "Business", "Campus Life", "Community", "Productivity", "Innovation"]
+    for item in categories:
+        st.markdown(f"- {item}")
     st.success("Your idea could become the next Coddy Buddy project.")
+
+    st.markdown("---")
+    if st.button("🚀 Join Us & Build Your Project", use_container_width=True, key="proj_btn_reg"):
+        navigate_to("Register")
 
 
 def contact_page():
@@ -236,6 +282,10 @@ def contact_page():
     st.write(f"**WhatsApp:** {PROGRAM_LEAD_WHATSAPP}")
     st.write(f"**Sessions:** {PROGRAM_SCHEDULE}, {PROGRAM_TIME}")
     st.write(f"**Venue:** {PROGRAM_VENUE}")
+
+    st.markdown("---")
+    if st.button("🚀 Ready? Submit Your Registration", use_container_width=True, key="contact_btn_reg"):
+        navigate_to("Register")
 
 
 def success_screen():
@@ -257,6 +307,16 @@ def success_screen():
         """,
         unsafe_allow_html=True,
     )
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🏠 Return to Home Page", use_container_width=True, key="btn_success_home"):
+            st.session_state["registration_submitted"] = False
+            navigate_to("Home")
+    with c2:
+        if st.button("📚 View Program Schedule", use_container_width=True, key="btn_success_prog"):
+            st.session_state["registration_submitted"] = False
+            navigate_to("Program")
 
 
 def register_page():
@@ -280,6 +340,7 @@ def register_page():
         field_program = ""
         year_of_study = ""
         occupation_background = ""
+
         if student_status == "Yes":
             institution = st.text_input("Institution")
             field_program = st.text_input("Field / Program of Study")
@@ -328,6 +389,7 @@ def register_page():
         "referral_source": referral_source,
         "other_referral_source": other_referral_source,
     }
+
     errors = validate_registration_form(form_data)
     if errors:
         for error in errors:
@@ -337,7 +399,9 @@ def register_page():
     try:
         if is_duplicate_registration(email, phone_number):
             st.warning(MSG_DUPLICATE_REGISTRATION)
+            st.info("A registration with this email address or phone number has already been recorded. If you need to change your info, please reach out to the organizers.")
             return
+
         row_data = {
             "Full Name": full_name.strip(),
             "Phone Number": phone_number.strip(),
@@ -357,8 +421,8 @@ def register_page():
             "Other Referral Source": other_referral_source.strip(),
         }
         add_registration(row_data)
-        st.session_state.registration_submitted = True
-        st.session_state.last_registered_name = full_name.strip()
+        st.session_state["registration_submitted"] = True
+        st.session_state["last_registered_name"] = full_name.strip()
         st.rerun()
     except GoogleSheetsError:
         st.error(MSG_SERVICE_UNAVAILABLE)
@@ -368,13 +432,16 @@ def admin_page():
     if not st.secrets.get("admin_password"):
         st.error(MSG_MISSING_CONFIG)
         return
+
     if "admin_authenticated" not in st.session_state:
         st.session_state.admin_authenticated = False
+
     if not st.session_state.admin_authenticated:
         with st.form("admin_login"):
             secret_code = st.text_input("Hidden Admin Access Code", type="password")
             password = st.text_input("Admin Password", type="password")
             submitted = st.form_submit_button("Open Admin Dashboard")
+
         if submitted:
             if secret_code != st.secrets.get("admin_access_code", ""):
                 st.error("Invalid access code.")
@@ -403,6 +470,7 @@ def admin_page():
         return
 
     st.metric("Total registrations", summary["total"])
+
     st.markdown("### Summary Tables")
     for title, key in [
         ("Students / Non-students", "students"),
@@ -415,6 +483,7 @@ def admin_page():
 
     st.markdown("### Registrations")
     st.dataframe(df, use_container_width=True, hide_index=True)
+
     st.download_button(
         "Download registrations as CSV",
         df.to_csv(index=False).encode("utf-8"),
@@ -424,37 +493,36 @@ def admin_page():
 
 
 def main():
-    # Private admin entry point: when the URL contains the secret ?admin=...
-    # query param, show ONLY the admin dashboard - no public nav, no other
-    # pages. This must be checked before anything else is rendered.
     if _is_secret_admin_entry():
         admin_page()
-        st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
+        year_val = datetime.now().year
+        st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=year_val)}")
         return
 
     if "page" not in st.session_state:
-        st.session_state.page = "Home"
+        st.session_state["page"] = "Home"
     if "registration_submitted" not in st.session_state:
-        st.session_state.registration_submitted = False
+        st.session_state["registration_submitted"] = False
     if "last_registered_name" not in st.session_state:
-        st.session_state.last_registered_name = ""
+        st.session_state["last_registered_name"] = ""
 
-    st.session_state.page = render_nav()
+    selected_nav = render_nav()
 
-    if st.session_state.page == "Home":
+    if selected_nav == "Home":
         home_page()
-    elif st.session_state.page == "About":
+    elif selected_nav == "About":
         about_page()
-    elif st.session_state.page == "Program":
+    elif selected_nav == "Program":
         program_page()
-    elif st.session_state.page == "Projects":
+    elif selected_nav == "Projects":
         projects_page()
-    elif st.session_state.page == "Register":
+    elif selected_nav == "Register":
         register_page()
-    elif st.session_state.page == "Contact":
+    elif selected_nav == "Contact":
         contact_page()
 
-    st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=datetime.now().year)}")
+    year_val = datetime.now().year
+    st.markdown(f"---\n{COPYRIGHT_TEXT.format(year=year_val)}")
 
 
 if __name__ == "__main__":
