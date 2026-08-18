@@ -133,7 +133,6 @@ def navigate_to(page_name: str):
     """Programmatically switch to a specific page and trigger an instant rerun."""
     if page_name in NAV_PAGES:
         st.session_state["page"] = page_name
-        st.session_state["nav_selection"] = page_name
         st.rerun()
 
 
@@ -183,18 +182,6 @@ def render_card(title, body):
 
 def home_page():
     render_hero()
-
-    # Action buttons with reliable programmatic navigation
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("🚀 JOIN CODDY BUDDY", use_container_width=True, key="home_btn_join"):
-            navigate_to("Register")
-    with c2:
-        if st.button("📚 Explore the Program", use_container_width=True, key="home_btn_program"):
-            navigate_to("Program")
-    with c3:
-        if st.button("ℹ️ About Coddy Buddy", use_container_width=True, key="home_btn_about"):
-            navigate_to("About")
 
     st.markdown("## Key Value")
     a, b, c = st.columns(3)
